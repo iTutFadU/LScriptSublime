@@ -1,0 +1,151 @@
+%YAML 1.2
+---
+name: LauncherScript
+file_extensions: [lsn, lsi]
+scope: source.launcherscript
+first_line_match: '(\\(define|include)|import\s+"lib/LS\.uls"\s*;).*'
+
+
+contexts:
+  main:
+    - include: comment
+    - include: preproc
+    - include: space
+
+    - match: '(import|run|space|package)\b'
+      scope: support.type
+
+    - match: '[cBS]?"'
+      scope: string
+      push: string
+
+    - match: '(\d+|\d*\.\d*)([eE][\-+]?\d+)?[fd]|\d+[bsL]?'
+      scope: constant.numeric
+
+    - match: '\b(BOOL|BYTE|SHORT|INT|LONG|FLOAT|DOUBLE|STR|LIST|NONE|LS\s*\.\s*Struct\s*\.\s*type\s*\(\s*[A-Za-z_][A-Za-z_0-9]*\s*\))\s*\|>'
+      scope: ls.cast
+
+    - match: '(false|true|none|BOOL|BYTE|SHORT|INT|LONG|FLOAT|DOUBLE|STR|LIST|NONE|(Infinity|NaN)[fd])\b'
+      scope: constant.language
+
+    - match: '(public|private|struct|draw|tick)\b'
+      scope: storage
+
+    - match: '(if|else|while|for|break|continue|return)\b'
+      scope: keyword
+
+    - match: '(this|new|var|func|field|cast|from)\b|(oper\s*|`)@?([!#%^&*\-=+|<>/]|\[\])+@?'
+      scope: storage.type
+
+    - match: '[!#%^&*\-=+|<>/]'
+      scope: keyword.operator
+
+    - match: '[\[\](){}.,~:]|[A-Za-z_][A-Za-z_0-9]*\s*[\[({.]'
+      scope: entity.name.function
+
+    - match: '[A-Za-z_][A-Za-z_0-9]*'
+      scope: variable.parameter
+
+    - match: ';'
+      scope: punctuation.separator
+
+    - include: error
+
+  string:
+    - match: '[^\\"]+'
+      scope: string
+
+    - match: '(\\[\\"0nt])+'
+      scope: keyword
+
+    - match: '"'
+      scope: string
+      pop: true
+
+    - include: error
+
+  preproc:
+    - match: '^[\r\t\f\v ]*\\'
+      scope: ls.pre
+      push: preproc_cmd
+
+  preproc_cmd:
+    - include: space
+    - include: preproc_end
+
+    - match: 'include'
+      scope: ls.pre
+      push: preproc_cmd_include
+
+    - match: 'define'
+      scope: ls.pre
+      push: preproc_cmd_define
+
+    - include: error
+
+  preproc_cmd_include:
+    - match: '^'
+      scope: invalid
+      pop: true
+
+    - match: '[^\n]+$'
+      scope: string
+      pop: true
+
+    - include: error
+
+  preproc_cmd_define:
+    - include: preproc_end
+
+    - match: '[\r\t\f\v ]+[A-Z_][A-Z0-9_]*([\r\t\f\v ]*\([\r\t\f\v ]*([a-zA-Z_][a-zA-Z0-9_]*,[\r\t\f\v ]*)*[a-zA-Z_][a-zA-Z0-9_]*[\r\t\f\v ]*\))?$'
+      scope: ls.def
+      pop: true
+
+    - match: '[\r\t\f\v ]+[A-Z_][A-Z0-9_]*([\r\t\f\v ]*\([\r\t\f\v ]*([a-zA-Z_][a-zA-Z0-9_]*,[\r\t\f\v ]*)*[a-zA-Z_][a-zA-Z0-9_]*[\r\t\f\v ]*\))?[\r\t\f\v ]+'
+      scope: ls.def
+      push: preproc_cmd_define2
+      pop: true
+
+    - include: space
+    - include: error
+
+  preproc_cmd_define2:
+    - match: '^'
+      scope: invalid
+      pop: true
+
+    - match: '[^\n]+$'
+      scope: string
+      pop: true
+
+    - include: error
+
+  comment:
+    - match: '//.*$'
+      scope: comment
+
+    - match: '/\*'
+      scope: comment
+      push: comment_multiline
+
+  comment_multiline:
+    - match: '[^*]+'
+      scope: comment
+
+    - match: '\*/'
+      scope: comment
+      pop: true
+
+    - match: '\*'
+      scope: comment
+
+  preproc_end:
+    - match: '$'
+      pop: true
+
+  space:
+    - match: '\s+'
+
+  error:
+    - match: '.+'
+      scope: invalid
