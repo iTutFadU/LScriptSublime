@@ -2,150 +2,390 @@
 ---
 name: LauncherScript
 file_extensions: [lsn, lsi]
-scope: source.launcherscript
-first_line_match: '(\\(define|include)|import\s+"lib/LS\.uls"\s*;).*'
+scope: source.lsn
+first_line_match: '(\\(define|include)|import\s+"lib[/\\]).*'
+version: 2
 
 
 contexts:
   main:
-    - include: comment
+    - include: expression
+      
+    - match: ';'
+      scope: punctuation.terminator.lsn
+
+    - match: '[)}\]]'
+      scope: invalid.lsn
+
+    - include: error
+
+  expression_p:
+    - include: expression
+      
+    - match: ','
+      scope: punctuation.separator.lsn
+
+    - match: '\)'
+      scope: punctuation.section.lsn
+      pop: 1
+
+    - match: '[\]}]'
+      scope: invalid.lsn
+      pop: 1
+
+    - include: error
+
+  expression_b:
+    - include: expression
+      
+    - match: ','
+      scope: punctuation.separator.lsn
+
+    - match: '\]'
+      scope: punctuation.section.lsn
+      pop: 1
+
+    - match: '[)}]'
+      scope: invalid.lsn
+      pop: 1
+
+    - include: error
+
+  expression_c:
+    - include: expression
+      
+    - match: ';'
+      scope: punctuation.terminator.lsn
+
+    - match: '\}'
+      scope: punctuation.section.lsn
+      pop: 1
+
+    - match: '[)\]]'
+      scope: invalid.lsn
+      pop: 1
+
+    - include: error
+
+  expression_cast:
+    - include: expression
+
+    - match: '\)'
+      scope: punctuation.section.lsn
+      set: func_begin
+
+    - match: '[\]}]'
+      scope: invalid.lsn
+      set: func_begin
+
+    - include: error
+
+  expression:
     - include: preproc
     - include: space
 
-    - match: '(import|run|space|package)\b'
-      scope: support.type
+    - match: '\('
+      scope: punctuation.section.lsn
+      push: expression_p
+    - match: '\['
+      scope: punctuation.section.lsn
+      push: expression_b
+    - match: '\{'
+      scope: punctuation.section.lsn
+      push: expression_c
 
-    - match: '[cBS]?"'
-      scope: string
+    - match: '([cCBS]?)"'
+      scope: punctuation.definition.string.begin.lsn
+      captures:
+        1: storage.type.string.lsn
       push: string
+    - match: '(0b)([01][01_]*)([bsL]?)'
+      captures:
+        1: constant.numeric.base.lsn
+        2: constant.numeric.value.lsn
+        3: constant.numeric.suffix.lsn
+    - match: '(0x)([0-9A-F][0-9A-F_]*)([bsL]?)'
+      captures:
+        1: constant.numeric.base.lsn
+        2: constant.numeric.value.lsn
+        3: constant.numeric.suffix.lsn
+    - match: '(0)([0-7][0-7_]*)([bsL]?)'
+      captures:
+        1: constant.numeric.base.lsn
+        2: constant.numeric.value.lsn
+        3: constant.numeric.suffix.lsn
+    - match: '([0-9][0-9_]*[eE][+\-]?[0-9]*)([fd]?)'
+      captures:
+        1: constant.numeric.value.lsn
+        2: constant.numeric.suffix.lsn
+    - match: '([0-9][0-9_]*)([bsLfd]?)'
+      captures:
+        1: constant.numeric.value.lsn
+        2: constant.numeric.suffix.lsn
+    - match: '((([0-9][0-9_]*)(\.([0-9][0-9_]*))?|\.([0-9][0-9_]*))([eE][+\-]?[0-9]*)?|Infinity|NaN)([fd]?)'
+      captures:
+        1: constant.numeric.value.lsn
+        8: constant.numeric.suffix.lsn
 
-    - match: '(\d+|\d*\.\d*)([eE][\-+]?\d+)?[fd]|\d+[bsL]?'
-      scope: constant.numeric
+    - match: 'this\b'
+      scope: variable.language.this.lsn
+    - match: '(true|false|none|__invoke)\b'
+      scope: constant.language.lsn
+    - match: '(break|continue|else|return|import|public|private|static)\b'
+      scope: keyword.control.lsn
+    - match: '(bool|byte|short|int|long|float|double|str|array)\b'
+      scope: storage.type.class.lsn
 
-    - match: '\b(BOOL|BYTE|SHORT|INT|LONG|FLOAT|DOUBLE|STR|LIST|NONE|LS\s*\.\s*Struct\s*\.\s*type\s*\(\s*[A-Za-z_][A-Za-z_0-9]*\s*\))\s*\|>'
-      scope: ls.cast
+    - match: '(if|while)\b'
+      scope: keyword.control.lsn
+      push: if
+    - match: 'var\b'
+      scope: keyword.declaration.lsn
+      push: var_name
+    - match: 'func\b'
+      scope: keyword.declaration.lsn
+      push: func_name
+    - match: 'oper\s*(\(\)|\[\]|@(\+\+|--)|([!#~-]|--|\+\+)@|(<<|>>>?|[+\-*/&|^]|%%?)=?|[!=]==?|!?<=>|[<>]=?|[&^|]{2})'
+      scope: keyword.declaration.lsn
+      captures:
+        1: constant.language.lsn
+      push: func_begin
+    - match: '(package|class)\b'
+      scope: keyword.declaration.lsn
+      push: package_name
+    - match: 'new\b'
+      scope: keyword.declaration.lsn
+      push: func_begin
+    - match: 'cast\b'
+      scope: keyword.declaration.lsn
+      push: cast_type
 
-    - match: '(false|true|none|BOOL|BYTE|SHORT|INT|LONG|FLOAT|DOUBLE|STR|LIST|NONE|(Infinity|NaN)[fd])\b'
-      scope: constant.language
+    - match: '_\b'
+      scope: variable.other.lsn
+    - match: '[A-Z]\b'
+      scope: storage.type.class.lsn
+    - match: '_*[A-Z0-9_]*\b'
+      scope: constant.character.lsn
+    - match: '_*[A-Z][A-Za-z0-9_]*\b'
+      scope: storage.type.class.lsn
+    - match: '([A-Za-z_][A-Za-z0-9_]*)\s*(\()'
+      captures:
+        1: variable.function.lsn
+        2: punctuation.section.lsn
+      push: expression_p
+    - match: '[A-Za-z_][A-Za-z0-9_]*\b'
+      scope: variable.other.lsn
 
-    - match: '(public|private|struct|draw|tick)\b'
-      scope: storage
+    - match: '`(\(\)|\[\]|@(\+\+|--)|([!#~-]|--|\+\+)@|(<<|>>>?|[+\-*/&|^]|%%?)=?|[!=]==?|!?<=>|[<>]=?|[&^|]{2})'
+      scope: constant.language.lsn
+    - match: '(<<|>>>?|[+\-*/&|^]|%%?)='
+      scope: keyword.operator.assignment.augmented.lsn
+    - match: '<<|>>>?'
+      scope: keyword.operator.bitwise.lsn
+    - match: '\|>|#|<-'
+      scope: keyword.operator.lsn
+    - match: '[!=]==?|!?<=>|[<>]=?'
+      scope: keyword.operator.comparison.lsn
+    - match: '[+\-%]{1,2}|[*/]'
+      scope: keyword.operator.arithmetic.lsn
+    - match: '!|[&|^]{2}'
+      scope: keyword.operator.logical.lsn
+    - match: '[~&|^]'
+      scope: keyword.operator.bitwise.lsn
+    - match: '='
+      scope: keyword.operator.assignment.lsn
 
-    - match: '(if|else|while|for|break|continue|return)\b'
-      scope: keyword
+    - match: '\.'
+      scope: punctuation.accessor.dot.lsn
 
-    - match: '(this|new|var|func|field|cast|from)\b|(oper\s*|`)@?([!#%^&*\-=+|<>/]|\[\])+@?'
-      scope: storage.type
+  cast_type:
+    - include: preproc
+    - include: space
 
-    - match: '[!#%^&*\-=+|<>/]'
-      scope: keyword.operator
+    - match: 'to\b'
+      scope: keyword.declaration.lsn
+      set: cast_begin
 
-    - match: '[\[\](){}.,~:]|[A-Za-z_][A-Za-z_0-9]*\s*[\[({.]'
-      scope: entity.name.function
+    - match: '[A-Za-z_][A-Za-z0-9_]*'
+      scope: variable.parameter.lsn
+      set: cast_from
 
-    - match: '[A-Za-z_][A-Za-z_0-9]*'
-      scope: variable.parameter
+    - include: error
+
+  cast_from:
+    - include: preproc
+    - include: space
+
+    - match: 'from\b'
+      scope: keyword.declaration.lsn
+      set: cast_begin
+
+    - include: error
+
+  cast_begin:
+    - include: preproc
+    - include: space
+
+    - match: '\('
+      scope: punctuation.section.lsn
+      set: cast_class
+
+    - include: error
+
+  cast_class:
+    - include: expression
+
+    - match: '\)'
+      scope: punctuation.section.lsn
+      set: func_do
+
+    - include: error
+
+  if:
+    - include: preproc
+    - include: space
+
+    - match: '\('
+      scope: punctuation.section.lsn
+      push: expression_p
+      pop: 1
+
+    - include: error
+
+  var_name:
+    - include: preproc
+    - include: space
+
+    - match: '[A-Za-z_][A-Za-z0-9_]*'
+      scope: variable.other.lsn
+      set: var_assign
+
+    - include: error
+
+  var_assign:
+    - include: preproc
+    - include: space
+
+    - match: '='
+      scope: keyword.operator.assignment.lsn
+      pop: 1
 
     - match: ';'
-      scope: punctuation.separator
+      scope: punctuation.terminator.lsn
+      pop: 1
 
     - include: error
 
-  string:
-    - match: '[^\\"]+'
-      scope: string
-
-    - match: '(\\[\\"0nt])+'
-      scope: keyword
-
-    - match: '"'
-      scope: string
-      pop: true
-
-    - include: error
-
-  preproc:
-    - match: '^[\r\t\f\v ]*\\'
-      scope: ls.pre
-      push: preproc_cmd
-
-  preproc_cmd:
+  func_name:
+    - include: preproc
     - include: space
-    - include: preproc_end
 
-    - match: 'include'
-      scope: ls.pre
-      push: preproc_cmd_include
-
-    - match: 'define'
-      scope: ls.pre
-      push: preproc_cmd_define
+    - match: '[A-Za-z_][A-Za-z0-9_]*'
+      scope: entity.name.function.lsn
+      set: func_begin
 
     - include: error
 
-  preproc_cmd_include:
-    - match: '^'
-      scope: invalid
-      pop: true
-
-    - match: '[^\n]+$'
-      scope: string
-      pop: true
-
-    - include: error
-
-  preproc_cmd_define:
-    - include: preproc_end
-
-    - match: '[\r\t\f\v ]+[A-Z_][A-Z0-9_]*([\r\t\f\v ]*\([\r\t\f\v ]*([a-zA-Z_][a-zA-Z0-9_]*,[\r\t\f\v ]*)*[a-zA-Z_][a-zA-Z0-9_]*[\r\t\f\v ]*\))?$'
-      scope: ls.def
-      pop: true
-
-    - match: '[\r\t\f\v ]+[A-Z_][A-Z0-9_]*([\r\t\f\v ]*\([\r\t\f\v ]*([a-zA-Z_][a-zA-Z0-9_]*,[\r\t\f\v ]*)*[a-zA-Z_][a-zA-Z0-9_]*[\r\t\f\v ]*\))?[\r\t\f\v ]+'
-      scope: ls.def
-      push: preproc_cmd_define2
-      pop: true
-
+  func_begin:
+    - include: preproc
     - include: space
+
+    - match: '\('
+      scope: punctuation.section.lsn
+      set: func_args
+
     - include: error
 
-  preproc_cmd_define2:
-    - match: '^'
-      scope: invalid
-      pop: true
+  func_args:
+    - include: preproc
+    - include: space
 
-    - match: '[^\n]+$'
-      scope: string
-      pop: true
+    - match: '[A-Za-z_][A-Za-z0-9_]*'
+      scope: variable.parameter.lsn
+      set: func_comma
+
+    - match: '\)'
+      scope: punctuation.section.lsn
+      set: func_do
+
+    - include: error
+
+  func_comma:
+    - include: preproc
+    - include: space
+
+    - match: ','
+      scope: punctuation.separator.lsn
+      set: func_args
+
+    - match: '\)'
+      scope: punctuation.section.lsn
+      set: func_do
+
+    - include: error
+
+  func_do:
+    - include: preproc
+    - include: space
+
+    - match: '\{'
+      scope: punctuation.section.lsn
+      push: expression_c
+      pop: 1
+
+    - include: error
+
+  package_name:
+    - include: preproc
+    - include: space
+
+    - match: '[A-Za-z_][A-Za-z0-9_]*'
+      scope: storage.type.class.lsn
+      set: func_do
 
     - include: error
 
   comment:
-    - match: '//.*$'
-      scope: comment
-
-    - match: '/\*'
-      scope: comment
-      push: comment_multiline
-
-  comment_multiline:
     - match: '[^*]+'
-      scope: comment
+      scope: comment.lsn
 
     - match: '\*/'
-      scope: comment
-      pop: true
+      scope: comment.lsn
+      pop: 1
 
-    - match: '\*'
-      scope: comment
+    - match: '\*+'
+      scope: comment.lsn
 
-  preproc_end:
-    - match: '$'
-      pop: true
+  preproc:
+    - match: '//.+$'
+      scope: comment.lsn
+    - match: '/\*'
+      scope: comment.lsn
+      push: comment
+
+    - match: '^\s*((\\include)\s*(.+)?$|(\\define)\s*([A-Z_][A-Z0-9_]*\b)?)'
+      captures:
+        2: keyword.control.import.include.lsn
+        3: string.lsn
+        4: keyword.control.import.define.lsn
+        5: constant.character.lsn
+
+  string:
+    - match: '([^\\"]+)'
+      scope: string.lsn
+
+    - match: '(\\[\\"0nt])+'
+      scope: constant.character.escape.lsn
+
+    - match: '"'
+      scope: punctuation.definition.string.end.lsn
+      pop: 1
+
+    - include: error
 
   space:
-    - match: '\s+'
+    - match: '\s*'
 
   error:
-    - match: '.+'
-      scope: invalid
+    - match: '.'
+      scope: invalid.lsn
